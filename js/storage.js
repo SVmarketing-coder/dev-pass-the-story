@@ -31,10 +31,13 @@
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
       return crypto.randomUUID();
     }
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-      const r = Math.random() * 16 | 0;
-      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-    });
+    // Fallback: use crypto.getRandomValues for cryptographically secure random bytes
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant bits
+    const hex = Array.from(bytes).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+    return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-' + hex.slice(16, 20) + '-' + hex.slice(20);
   }
 
   /* =========================================================
@@ -99,6 +102,18 @@
   }
 
   /* =========================================================
+     PASSWORD HASHING  (SHA-256 via Web Crypto API)
+     ========================================================= */
+
+  async function hashPassword(password) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+  }
+
+  /* =========================================================
      COLLECTION STORAGE  (each collection is one localStorage key)
      ========================================================= */
 
@@ -151,7 +166,7 @@
     const key = colKey(this._colPath);
     function handler(e) {
       const eventKey = (e.type === 'pts-storage-change') ? e.detail.key : e.key;
-      if (eventKey === key || eventKey === null) fire();
+      if (eventKey === key) fire();
     }
     window.addEventListener('storage',            handler);
     window.addEventListener('pts-storage-change', handler);
@@ -229,7 +244,7 @@
     const key = colKey(this._colPath);
     function handler(e) {
       const eventKey = (e.type === 'pts-storage-change') ? e.detail.key : e.key;
-      if (eventKey === key || eventKey === null) fire();
+      if (eventKey === key) fire();
     }
     window.addEventListener('storage',            handler);
     window.addEventListener('pts-storage-change', handler);
@@ -288,40 +303,42 @@
   const auth = {
     currentUser: null,
 
-    signInWithEmailAndPassword: function (email, pass) {
+    signInWithEmailAndPassword: async function (email, pass) {
       const users = getUsers();
       const found = Object.values(users).find(function (u) { return u.email === email; });
       if (!found) {
         const e = new Error('No account found with this email.');
         e.code = 'auth/user-not-found';
-        return Promise.reject(e);
+        throw e;
       }
-      if (found.password !== pass) {
+      const hash = await hashPassword(pass);
+      if (found.password !== hash) {
         const e = new Error('Incorrect password.');
         e.code = 'auth/wrong-password';
-        return Promise.reject(e);
+        throw e;
       }
       const sessionUser = { uid: found.uid, email: found.email, displayName: found.displayName || '' };
       auth.currentUser = sessionUser;
       localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
       setTimeout(function () { notifyAuth(sessionUser); }, 0);
-      return Promise.resolve({ user: sessionUser });
+      return { user: sessionUser };
     },
 
-    createUserWithEmailAndPassword: function (email, pass) {
+    createUserWithEmailAndPassword: async function (email, pass) {
       const users = getUsers();
       if (Object.values(users).some(function (u) { return u.email === email; })) {
         const e = new Error('An account with this email already exists.');
         e.code = 'auth/email-already-in-use';
-        return Promise.reject(e);
+        throw e;
       }
       if (pass.length < 6) {
         const e = new Error('Password must be at least 6 characters.');
         e.code = 'auth/weak-password';
-        return Promise.reject(e);
+        throw e;
       }
       const uid = uuid();
-      users[uid] = { uid: uid, email: email, password: pass, displayName: '' };
+      const hash = await hashPassword(pass);
+      users[uid] = { uid: uid, email: email, password: hash, displayName: '' };
       saveUsers(users);
       const sessionUser = { uid: uid, email: email, displayName: '' };
       auth.currentUser = sessionUser;
@@ -342,7 +359,7 @@
           return Promise.resolve();
         }
       };
-      return Promise.resolve({ user: credUser });
+      return { user: credUser };
     },
 
     signOut: function () {
