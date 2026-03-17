@@ -22,9 +22,8 @@ const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 10;
 
 /* =========================================================
-   FIREBASE INITIALIZATION
-   (firebase.initializeApp() is called in the DOMContentLoaded
-    handler below; db and auth are assigned there too.)
+   BACKEND REFERENCES
+   (db and auth are provided by js/storage.js – localStorage backend)
    ========================================================= */
 let db   = null;
 let auth = null;
@@ -301,7 +300,8 @@ async function handleJoin() {
         userId: currentUser.uid,
         displayName: currentUser.displayName || currentUser.email,
         joinedAt: Date.now()
-      })
+      }),
+      playerIds: firebase.firestore.FieldValue.arrayUnion(currentUser.uid)
     });
 
     hideJoinModal();
@@ -923,32 +923,9 @@ async function router() {
    BOOTSTRAP
    ========================================================= */
 document.addEventListener('DOMContentLoaded', () => {
-  // Initialize Firebase
-  if (!window.FIREBASE_CONFIG || window.FIREBASE_CONFIG.apiKey === 'YOUR_API_KEY') {
-    document.getElementById('loading-overlay').innerHTML = `
-      <div style="text-align:center;padding:2rem;max-width:500px">
-        <div style="font-size:3rem;margin-bottom:1rem">⚙️</div>
-        <h2 style="margin-bottom:1rem;color:#e8e9f0">Firebase Setup Required</h2>
-        <p style="color:#8a8da8;margin-bottom:1.5rem;line-height:1.7">
-          To run this app, you need to configure Firebase.<br>
-          Edit <code style="background:#252840;padding:.2em .5em;border-radius:4px">js/config.js</code>
-          with your Firebase project credentials.<br><br>
-          See <strong>README.md</strong> for step-by-step instructions.
-        </p>
-        <a href="https://console.firebase.google.com/" target="_blank"
-           style="display:inline-block;background:#7c6af7;color:#fff;padding:.65rem 1.5rem;
-                  border-radius:8px;font-weight:600;text-decoration:none">
-          Open Firebase Console
-        </a>
-      </div>`;
-    return;
-  }
-
-  firebase.initializeApp(window.FIREBASE_CONFIG);
-
-  // Initialize Firestore and Auth after app is initialized
-  db   = firebase.firestore();
-  auth = firebase.auth();
+  // db and auth are provided by js/storage.js (localStorage backend)
+  db   = window.db;
+  auth = window.auth;
 
   // Sign-out button
   document.getElementById('btn-signout').addEventListener('click', async () => {
