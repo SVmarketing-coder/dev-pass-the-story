@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pass the Story</title>
+  <meta name="description" content="A collaborative, turn-based online storytelling game for 2–10 players." />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>" />
+  <link rel="stylesheet" href="css/style.css" />
+
+  <!-- Firebase compat CDN (v9 compat layer = v8-style API) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <!-- App config (replace with your Firebase credentials) -->
+  <script>
+    // Inline config loaded from js/config.js at build time.
+    // In development, edit js/config.js directly.
+    // In production (GitHub Pages), this is injected by the deploy workflow.
+  </script>
+  <script src="js/config.js"></script>
+
+  <!-- Expose FIREBASE_CONFIG to app.js -->
+  <script>window.FIREBASE_CONFIG = typeof FIREBASE_CONFIG !== 'undefined' ? FIREBASE_CONFIG : null;</script>
+</head>
+<body>
+<div id="app">
+
+  <!-- ======================================================
+       LOADING OVERLAY
+       ====================================================== -->
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <span class="loading-text">Loading…</span>
+  </div>
+
+  <!-- ======================================================
+       TOAST CONTAINER
+       ====================================================== -->
+  <div id="toast-container"></div>
+
+  <!-- ======================================================
+       NAVBAR (hidden when logged out)
+       ====================================================== -->
+  <nav class="navbar hidden" id="navbar">
+    <div class="navbar-brand" id="nav-logo" style="cursor:pointer">
+      <span class="logo-icon">📖</span>
+      Pass the Story
+    </div>
+    <div class="navbar-actions">
+      <div class="navbar-user">
+        <div class="avatar" id="nav-avatar-text">?</div>
+        <span id="nav-username"></span>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="btn-signout">Sign out</button>
+    </div>
+  </nav>
+
+  <!-- ======================================================
+       PAGE: AUTH (Login / Register)
+       ====================================================== -->
+  <div class="page" id="page-auth">
+    <div class="auth-container">
+      <div class="auth-box">
+        <div class="auth-logo">
+          <div style="font-size:3.5rem;margin-bottom:.5rem">📖</div>
+          <div class="title">Pass the Story</div>
+          <div class="subtitle">A collaborative storytelling game for 2–10 players</div>
+        </div>
+
+        <div class="auth-tabs">
+          <button class="auth-tab active" data-tab="login">Sign In</button>
+          <button class="auth-tab" data-tab="register">Create Account</button>
+        </div>
+
+        <!-- Login Form -->
+        <div id="form-login" class="auth-form card">
+          <div id="login-error" class="form-error mb-2"></div>
+          <div class="form-group">
+            <label class="form-label" for="login-email">Email</label>
+            <input class="form-control" id="login-email" type="email"
+                   placeholder="your@email.com" autocomplete="email" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="login-password">Password</label>
+            <input class="form-control" id="login-password" type="password"
+                   placeholder="••••••••" autocomplete="current-password" />
+          </div>
+          <button class="btn btn-primary btn-full mt-2" id="btn-login">Sign In</button>
+        </div>
+
+        <!-- Register Form -->
+        <div id="form-register" class="auth-form card hidden">
+          <div id="reg-error" class="form-error mb-2"></div>
+          <div class="form-group">
+            <label class="form-label" for="reg-name">Display Name</label>
+            <input class="form-control" id="reg-name" type="text"
+                   placeholder="Your name in the game" autocomplete="nickname" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="reg-email">Email</label>
+            <input class="form-control" id="reg-email" type="email"
+                   placeholder="your@email.com" autocomplete="email" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="reg-password">Password</label>
+            <input class="form-control" id="reg-password" type="password"
+                   placeholder="At least 6 characters" autocomplete="new-password" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="reg-password2">Confirm Password</label>
+            <input class="form-control" id="reg-password2" type="password"
+                   placeholder="Repeat password" autocomplete="new-password" />
+          </div>
+          <button class="btn btn-primary btn-full mt-2" id="btn-register">Create Account</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================
+       PAGE: LOBBY
+       ====================================================== -->
+  <div class="page" id="page-lobby">
+    <div class="lobby-container">
+      <div class="lobby-header">
+        <h1>🏠 My Stories</h1>
+        <div class="lobby-actions">
+          <button class="btn btn-secondary" id="btn-join-game">🔑 Join Game</button>
+          <button class="btn btn-primary"   id="btn-create-game">✨ New Game</button>
+        </div>
+      </div>
+
+      <!-- Tab navigation -->
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="my-games">My Games</button>
+      </div>
+      <div class="tab-panel active" id="tab-panel-my-games">
+        <div class="games-grid" id="my-games-grid">
+          <p class="text-muted text-center mt-2">Loading…</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Join Game Modal -->
+    <div class="modal-overlay hidden" id="join-modal">
+      <div class="modal">
+        <div class="modal-header">
+          <h2 class="modal-title">🔑 Join a Game</h2>
+          <button class="modal-close" id="btn-join-modal-close">✕</button>
+        </div>
+        <div id="join-error" class="form-error mb-2"></div>
+        <div class="form-group">
+          <label class="form-label" for="join-code-input">Enter 6-character game code</label>
+          <input class="form-control" id="join-code-input" type="text"
+                 maxlength="6" placeholder="ABCD12"
+                 style="text-transform:uppercase;letter-spacing:.15em;font-size:1.5rem;text-align:center;font-weight:700" />
+          <span class="form-hint">Ask the game creator for their join code.</span>
+        </div>
+        <button class="btn btn-primary btn-full mt-2" id="btn-submit-join">Join Game</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================
+       PAGE: CREATE GAME
+       ====================================================== -->
+  <div class="page" id="page-create">
+    <div class="create-container">
+      <div class="page-heading">
+        <h1>✨ Create a New Game</h1>
+        <p>Set up a game and share the join code with friends.</p>
+      </div>
+
+      <div class="card">
+        <div id="create-error" class="form-error mb-2"></div>
+
+        <div class="form-group">
+          <label class="form-label">Maximum Players</label>
+          <div class="player-count-row" id="player-count-row"></div>
+          <span class="form-hint">Choose how many players can join (2–10). The game starts when the host is ready.</span>
+        </div>
+
+        <div class="alert alert-info mt-2">
+          <span>📜</span>
+          <span>
+            Each player writes <strong>at least 200 characters</strong> per turn.
+            The next player only sees the <strong>last 50 characters</strong> of the previous passage.
+            The story ends when <strong>all players vote "Game Over"</strong>.
+          </span>
+        </div>
+
+        <div class="flex gap-2 mt-3" style="flex-wrap:wrap">
+          <button class="btn btn-ghost" id="btn-create-back">← Back</button>
+          <button class="btn btn-primary" id="btn-create-submit">Create Game →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================
+       PAGE: WAITING ROOM
+       ====================================================== -->
+  <div class="page" id="page-waiting">
+    <div class="waiting-container">
+      <div class="page-heading">
+        <h1>⏳ Waiting Room</h1>
+        <p id="waiting-hint">Waiting for players…</p>
+      </div>
+
+      <!-- Join Code -->
+      <div class="join-code-box">
+        <div class="label">Share this code with friends:</div>
+        <div class="join-code" id="waiting-code">------</div>
+        <div class="copy-hint">
+          <button class="btn btn-ghost btn-sm" id="btn-copy-code">📋 Copy Code</button>
+        </div>
+      </div>
+
+      <!-- Player slots overview -->
+      <div class="card mb-2">
+        <div class="card-header">
+          <span class="card-title">Players</span>
+          <div class="waiting-slots" id="waiting-slots"></div>
+        </div>
+        <div class="players-list" id="waiting-players"></div>
+      </div>
+
+      <div class="flex gap-2" style="flex-wrap:wrap">
+        <button class="btn btn-ghost" id="btn-waiting-back">← Leave</button>
+        <button class="btn btn-success hidden" id="btn-start-game">🚀 Start Game</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================
+       PAGE: GAME (active)
+       ====================================================== -->
+  <div class="page" id="page-game">
+    <div class="game-layout">
+
+      <!-- Main column -->
+      <div class="game-main">
+
+        <!-- Story preview -->
+        <div class="story-preview-box">
+          <div class="story-preview-label">
+            <span class="dot"></span>
+            Last 50 characters of the story
+          </div>
+          <div class="story-preview-text" id="story-preview-text"></div>
+        </div>
+
+        <!-- Write area (shown only on your turn) -->
+        <div id="write-box" class="write-box hidden">
+          <div class="write-box-header">
+            <span class="write-box-title">✍️ Your turn — continue the story</span>
+            <span class="char-counter not-ok" id="char-counter">0 / 200 min</span>
+          </div>
+          <textarea
+            class="form-control"
+            id="story-input"
+            rows="8"
+            placeholder="Continue the story… (minimum 200 characters)"
+            style="min-height:180px"
+          ></textarea>
+          <div id="game-error" class="form-error mt-1"></div>
+          <div class="write-actions">
+            <button class="btn btn-primary" id="btn-submit-turn">Submit Turn →</button>
+            <div id="game-over-section" class="hidden">
+              <button class="btn btn-danger" id="btn-game-over-vote">🏁 Vote Game Over</button>
+              <span class="game-over-hint">All players must vote to end the game.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Waiting for another player (shown when not your turn) -->
+        <div id="waiting-turn-box" class="not-your-turn hidden">
+          <div class="spinner"></div>
+          <p>Waiting for <span class="waiting-turn-name" id="waiting-turn-name"></span> to write…</p>
+        </div>
+
+      </div>
+
+      <!-- Sidebar -->
+      <div class="game-sidebar">
+
+        <!-- Turn order -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Turn Order</span>
+            <span class="badge badge-primary" id="turn-count">Turn 1</span>
+          </div>
+          <div class="turn-order-list" id="turn-order-list"></div>
+        </div>
+
+        <!-- Game-over votes -->
+        <div class="game-over-votes-box card">
+          <div class="game-over-votes-title">Game Over Votes</div>
+          <div class="votes-bar-bg">
+            <div class="votes-bar-fill" id="votes-bar-fill" style="width:0%"></div>
+          </div>
+          <div class="votes-count" id="votes-count">0 / ? players voted</div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ======================================================
+       PAGE: STORY (finished)
+       ====================================================== -->
+  <div class="page" id="page-story">
+    <div class="story-container">
+      <div class="page-heading">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem">
+          <h1>📖 The Story</h1>
+          <button class="btn btn-ghost btn-sm" id="btn-story-back">← Back to Lobby</button>
+        </div>
+      </div>
+
+      <!-- Story metadata -->
+      <div class="story-meta">
+        <span class="badge badge-success">Finished</span>
+        <span id="story-game-id"></span>
+        <span>📅 <span id="story-date"></span></span>
+        <span>👥 <span id="story-players"></span></span>
+        <span>✍️ <span id="story-turns"></span></span>
+      </div>
+
+      <!-- Story body -->
+      <div class="story-body" id="story-contributions"></div>
+
+      <!-- Comments -->
+      <div class="comments-section">
+        <h3>💬 Comments</h3>
+        <div class="comment-list" id="comment-list">
+          <p class="no-comments">No comments yet.</p>
+        </div>
+
+        <div class="comment-form card">
+          <h4>Add a comment</h4>
+          <div class="form-group">
+            <textarea class="form-control" id="comment-input" rows="3"
+                      placeholder="Share your thoughts on the story… (Ctrl+Enter to submit)"></textarea>
+          </div>
+          <div id="comment-error" class="form-error mb-1"></div>
+          <button class="btn btn-primary" id="btn-add-comment">Post Comment</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- #app -->
+
+<!-- Main app script -->
+<script src="js/app.js"></script>
+</body>
+</html>
