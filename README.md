@@ -15,79 +15,47 @@ A collaborative, turn-based online storytelling game for **2–10 players**.
 7. Once **all players have voted** to end, the **full story is revealed**
 8. Everyone can **comment** on the completed story
 
+> **Tip — multiplayer on one device:** open the game in separate browser tabs,
+> one tab per player. Each tab shares the same localStorage, so turns update
+> in real time across all tabs.
+
 ## 🚀 Live Demo
 
 > Deployed at: `https://<your-github-username>.github.io/dev-pass-the-story/`
 
+No sign-up or configuration is needed — just open the link and play!
+
 ---
 
-## ⚙️ Setup & Deployment
+## ⚙️ Deployment
 
-### 1. Create a Firebase Project
+The app is a static site hosted on **GitHub Pages**. It needs no backend, no
+database, and no API keys. Everything runs in the browser.
 
-1. Go to [Firebase Console](https://console.firebase.google.com/)
-2. Click **Add project** and follow the setup wizard
-3. Once created, click the **`</>`** (Web) icon to add a web app
-4. Register the app (you don't need Firebase Hosting — we use GitHub Pages)
-5. Copy the `firebaseConfig` values shown
+### Enable GitHub Pages
 
-### 2. Enable Firebase Services
+1. Fork or push this repository to your GitHub account
+2. Go to **Settings → Pages**
+3. Under **Source**, select **GitHub Actions**
+4. Push to `main` — the workflow in `.github/workflows/deploy.yml` will deploy
+   the site automatically
 
-In the Firebase Console:
+That's it. The live URL will be:
 
-- **Authentication** → Sign-in method → Enable **Email/Password**
-- **Firestore Database** → Create database → Start in **test mode** (then apply security rules below)
-
-### 3. Apply Firestore Security Rules
-
-In **Firestore → Rules**, paste the contents of `firestore.rules` from this repository and click **Publish**.
-
-### 4. Add Firebase Indexes
-
-In Firestore, create a **composite index** for the games query:
-
-| Collection | Field | Order |
-|---|---|---|
-| `games` | `playerIds` (Array) | — |
-| `games` | `createdAt` | Descending |
-
-> Firestore will also prompt you with a direct link to create indexes when you first run the app.
-
-### 5. Configure the App
-
-**Option A – Local development:**
-
-Edit `js/config.js` and replace the placeholder values:
-
-```js
-const FIREBASE_CONFIG = {
-  apiKey:            "YOUR_API_KEY",
-  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId:         "YOUR_PROJECT_ID",
-  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId:             "YOUR_APP_ID"
-};
+```
+https://<your-github-username>.github.io/<repository-name>/
 ```
 
-**Option B – GitHub Pages deployment (recommended):**
+### Run locally
 
-Add the following [GitHub Repository Secrets](https://docs.github.com/en/actions/security-guides/encrypted-secrets):
+Serve the repository root with any static file server, for example:
 
-| Secret Name | Value |
-|---|---|
-| `FIREBASE_API_KEY` | Your Firebase API key |
-| `FIREBASE_AUTH_DOMAIN` | `<project-id>.firebaseapp.com` |
-| `FIREBASE_PROJECT_ID` | Your project ID |
-| `FIREBASE_STORAGE_BUCKET` | `<project-id>.appspot.com` |
-| `FIREBASE_MESSAGING_SENDER_ID` | Your sender ID |
-| `FIREBASE_APP_ID` | Your app ID |
+```bash
+python3 -m http.server 8000
+# then open http://localhost:8000
+```
 
-### 6. Enable GitHub Pages
-
-1. Go to your repo → **Settings → Pages**
-2. Under **Source**, select **GitHub Actions**
-3. Push to `main` — the workflow in `.github/workflows/deploy.yml` will build and deploy automatically
+No build step, no `npm install`, no environment variables.
 
 ---
 
@@ -98,9 +66,9 @@ Add the following [GitHub Repository Secrets](https://docs.github.com/en/actions
 ├── css/
 │   └── style.css           # All styles (dark theme, responsive)
 ├── js/
-│   ├── config.js           # Firebase configuration (edit this!)
+│   ├── storage.js          # localStorage backend (auth + database)
+│   ├── config.js           # App configuration (no credentials needed)
 │   └── app.js              # Full application logic
-├── firestore.rules         # Firestore security rules
 ├── .github/
 │   └── workflows/
 │       └── deploy.yml      # GitHub Pages auto-deploy workflow
@@ -109,18 +77,22 @@ Add the following [GitHub Repository Secrets](https://docs.github.com/en/actions
 
 ## 🔒 Security
 
-- All routes require authentication
-- Firestore rules enforce that only game participants can read/write story data
+- All routes require a local account (email + password stored in `localStorage`)
+- Only game participants can view a finished story
 - HTML output is sanitised to prevent XSS
 - Comments are limited to 1,000 characters
+
+> **Note:** Because data is stored in `localStorage`, it is local to the
+> browser and device. Clearing browser storage will remove accounts and game
+> history. For a production multi-device experience a persistent backend would
+> be needed.
 
 ## 🛠️ Tech Stack
 
 | Layer | Technology |
 |---|---|
 | Frontend | Vanilla JavaScript (ES6+), HTML5, CSS3 |
-| Backend / Auth | Firebase Authentication |
-| Database | Cloud Firestore (real-time) |
+| Auth & Database | Browser `localStorage` (no external services) |
 | Hosting | GitHub Pages |
 | CI/CD | GitHub Actions |
 

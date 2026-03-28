@@ -8,21 +8,8 @@
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>" />
   <link rel="stylesheet" href="css/style.css" />
 
-  <!-- Firebase compat CDN (v9 compat layer = v8-style API) -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-
-  <!-- App config (replace with your Firebase credentials) -->
-  <script>
-    // Inline config loaded from js/config.js at build time.
-    // In development, edit js/config.js directly.
-    // In production (GitHub Pages), this is injected by the deploy workflow.
-  </script>
-  <script src="js/config.js"></script>
-
-  <!-- Expose FIREBASE_CONFIG to app.js -->
-  <script>window.FIREBASE_CONFIG = typeof FIREBASE_CONFIG !== 'undefined' ? FIREBASE_CONFIG : null;</script>
+  <!-- localStorage backend (no external services required) -->
+  <script src="js/storage.js"></script>
 </head>
 <body>
 <div id="app">
